@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+service Follower {
+  rpc GetTime(GetTimeRequest) returns (Timespec) {}
+  rpc SetTime(SetTimeRequest) returns (SetTimeResponse) {}
+}
+
+message GetTimeRequest {}
+message SetTimeResponse {}
+
+message SetTimeRequest {
+  Timeval delta = 1;
+  Timeval oldDelta = 2;
+}
+
+message Timeval {
+  int64 seconds = 1;
+  int64 microseconds = 2;
+}
+
+message Timespec {
+  int64 seconds = 1;
+  int64 nanoseconds = 2;
+}
