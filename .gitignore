@@ -33,3 +33,11 @@
 
 
 cmake-build-debug
+cmake_install.cmake
+CMakeFiles/
+CMakeCache.txt
+follower
+leader
+Makefile
+time_server
+time_client

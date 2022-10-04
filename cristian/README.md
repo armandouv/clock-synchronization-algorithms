@@ -1,23 +1,42 @@
-RPC
+**Requirements**
 
-BerkeleyFollower
+Working installations of gRPC and libfaketime are needed. libfaketime needs to be compiled with the settime mocking
+flag.
 
-- datetime get_time()
-- set_time(datetime time)
+CMake and make are also required for building the project.
 
-BerkeleyLeader
+gRPC is used for RPC between nodes, and libfaketime is used for mocking time-related system calls. Otherwise, the
+program
+needs root permissions to change the system time.
 
-Follower must listen for requests, leader does not listen.
-Leader get average of followers and listens
+**Compiling**
 
-Use libfaketime to mock system calls to time.
-Add env variable LD_PRELOAD=/usr/local/lib/faketime/libfaketime.so.1
+From cristian directory:
+
+`cmake CMakeLists.txt`
+
+`make all`
+
+**Usage**
+
+Add env variable LD_PRELOAD=/usr/local/lib/faketime/libfaketime.so.1 (a valid installation of libfaketime is needed):
+
+`export LD_PRELOAD=/usr/local/lib/faketime/libfaketime.so.1`
+
+`./time_server port1`
+
+`... more servers`
+
+`./time_client port1 port2 ...more ports`
+
+**Roadmap**
 
 Use Docker to isolate nodes.
 
-Info on installing grpc and libfaketime.
+Add info on installing grpc and libfaketime.
 
-Compiling proto:
+Generating protos:
 
-protoc -I ./protos --grpc_out=gen --plugin=protoc-gen-grpc=`which grpc_cpp_plugin` ./protos/time_server.proto
-protoc -I ./protos --cpp_out=gen ./protos/time_server.proto
+`protoc -I ./protos --grpc_out=gen --plugin=protoc-gen-grpc="which grpc_cpp_plugin" ./protos/time_server.proto`
+
+`protoc -I ./protos --cpp_out=gen ./protos/time_server.proto`
