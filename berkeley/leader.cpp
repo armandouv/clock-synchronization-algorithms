@@ -25,6 +25,7 @@ using grpc::ClientContext;
 class Leader {
     vector<unique_ptr<Follower::Stub>> stubs;
     const long NANO = 1000000000;
+    const long MAX_TIME_DIFFERENCE_IN_SECONDS = 60;
 
     static long get_offset(const long &reference, const long &to_adjust) {
         long diff = abs(reference - to_adjust);
@@ -39,6 +40,13 @@ class Leader {
 
     static long get_ns_offset(const timespec &reference, const timespec &to_adjust) {
         return get_offset(reference.tv_nsec, to_adjust.tv_nsec);
+    }
+
+    bool out_of_time_threshold(const timespec &reference, const timespec &to_check) const {
+        auto secs_diff = abs(get_secs_offset(reference, to_check));
+        auto ns_diff = abs(get_ns_offset(reference, to_check));
+
+        return secs_diff + (ns_diff / NANO) >= MAX_TIME_DIFFERENCE_IN_SECONDS;
     }
 
     void synchronize() {
@@ -68,10 +76,10 @@ class Leader {
             chrono::nanoseconds elapsed_time_half_ns =
                     chrono::duration_cast<chrono::nanoseconds>((end - start) / 2);
 
-            long half_diff_secs = elapsed_time_half_ns.count() % NANO;
+            long half_diff_secs = elapsed_time_half_ns.count() / NANO;
             long half_diff_ns = elapsed_time_half_ns.count() - (half_diff_secs * NANO);
 
-            long complete_diff_secs = elapsed_time_ns.count() % NANO;
+            long complete_diff_secs = elapsed_time_ns.count() / NANO;
             long complete_diff_ns = elapsed_time_ns.count() - (complete_diff_secs * NANO);
 
             // "Catch up"
@@ -82,16 +90,27 @@ class Leader {
             timespec current_follower_time{(response.seconds() + half_diff_secs),
                                            (response.nanoseconds() + half_diff_ns)};
 
-            average.tv_sec += current_follower_time.tv_sec + ((i + 1) * complete_diff_secs);
-            average.tv_nsec += current_follower_time.tv_nsec + ((i + 1) * complete_diff_ns);
             // No need to update the leader's time since it can be obtained anytime.
             // TODO: Optimize this
             for (auto &follower_time: follower_times) {
                 follower_time.tv_sec += complete_diff_secs;
                 follower_time.tv_nsec += complete_diff_ns;
             }
-            follower_times.push_back(current_follower_time);
 
+            // Check if current follower's value is out of the specified threshold
+            timespec curr_leader_time{};
+            clock_gettime(CLOCK_REALTIME, &curr_leader_time);
+
+            // If the current follower time is inside the threshold, we consider it for the average.
+            // Else, we use the current leader time.
+            timespec current_follower_time_for_average{current_follower_time};
+            if (out_of_time_threshold(curr_leader_time, current_follower_time))
+                current_follower_time_for_average = curr_leader_time;
+
+            average.tv_sec += current_follower_time_for_average.tv_sec + ((i + 1) * complete_diff_secs);
+            average.tv_nsec += current_follower_time_for_average.tv_nsec + ((i + 1) * complete_diff_ns);
+            // However, we'll always push the original follower time because we need it to calculate the final offset.
+            follower_times.push_back(current_follower_time);
         }
 
         // +1 takes into account the leader as well
@@ -121,11 +140,12 @@ class Leader {
             chrono::nanoseconds elapsed_time_ns =
                     chrono::duration_cast<chrono::nanoseconds>(end - start);
 
-            long diff_secs = elapsed_time_ns.count() % NANO;
+            long diff_secs = elapsed_time_ns.count() / NANO;
             long diff_ns = elapsed_time_ns.count() - (diff_secs * NANO);
 
             const timespec new_time{average.tv_sec + diff_secs,
                                     average.tv_nsec + diff_ns};
+            cout << new_time.tv_sec << endl;
 
 
             auto delta = new Timeval();

@@ -83,7 +83,7 @@ int main(int argc, char *argv[]) {
     // Initial random time
     std::random_device rd;
     std::mt19937 mt(rd());
-    std::uniform_int_distribution<int> dist(1, 60);
+    std::uniform_int_distribution<int> dist(1, 80);
     timeval offset{dist(mt), 0};
 
     cout << "Initial offset from real time: " << offset.tv_sec << " seconds" << endl;
