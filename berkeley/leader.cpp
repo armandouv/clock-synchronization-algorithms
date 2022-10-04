@@ -2,63 +2,70 @@
 // Created by armandouv on 3/10/22.
 //
 
+#include <sys/time.h>
+#include <charconv>
+
+#include <grpc/grpc.h>
+#include <grpcpp/channel.h>
+#include <grpcpp/client_context.h>
+#include <grpcpp/create_channel.h>
+#include <grpcpp/security/credentials.h>
+
+#include "gen/follower.grpc.pb.h"
+#include "gen/follower.pb.h"
+
+using namespace std;
+using grpc::ChannelInterface;
+using grpc::CreateChannel;
+
+
 // TODO: Implement Leader election
 
 class Leader {
-public:
-    // Returns timespec from time.h
-    Status GetTime(ServerContext *_context,
-                   const GetTimeRequest *_request, Timespec *response) override {
-        timespec current_time{};
-        clock_gettime(CLOCK_REALTIME, &current_time);
+    vector<unique_ptr<Follower::Stub>> stubs;
 
-        response->set_seconds(current_time.tv_sec);
-        response->set_nanoseconds(current_time.tv_nsec);
+    void synchronize() {
 
-        return Status::OK;
     }
 
-    Status SetTime(ServerContext *_context,
-                   const SetTimeRequest *request, SetTimeResponse *_response) override {
-        const auto& delta_grpc = request->delta();
-        const auto& old_delta_grpc = request->olddelta();
+public:
+    Leader(const vector<shared_ptr<grpc::Channel>> &channels, int attempts) {
+        for (const auto &channel: channels)
+            stubs.push_back(Follower::NewStub(channel));
 
-        timeval delta{delta_grpc.seconds(), delta_grpc.microseconds()};
-        // TODO: Check for old delta and adjust until it is zero.
-        timeval _old_delta{old_delta_grpc.seconds(), old_delta_grpc.microseconds()};
-
-        auto status_code = adjtime(&delta, nullptr);
-        if (status_code != 0)
-            cout << "Couldn't adjust follower's time." << endl;
-
-        return status_code == 0 ?
-               Status::OK : Status(grpc::INTERNAL, "Couldn't adjust follower's time.");
+        for (auto i = 0; i < attempts; i++)
+            synchronize();
     }
 };
 
 
 int main(int argc, char *argv[]) {
-    if (argc != 2) {
-        cout << "Usage: ./follower <port>" << endl;
+    if (argc == 1) {
+        cout << "Usage: ./leader <port1> <port2> ..." << endl;
         return -1;
     }
 
-    int port;
-    auto [_, errc] = from_chars(argv[1], argv[1] + strlen(argv[1]), port);
+    vector<int> ports;
+    for (int i = 1; i < argc; i++) {
+        int port;
+        auto [_, errc] = from_chars(argv[1], argv[1] + strlen(argv[1]), port);
 
-    if (errc != std::errc{}) {
-        cout << "Invalid port: " << argv[1] << endl;
-        cout << "Usage: ./follower <port>" << endl;
-        return -1;
+        if (errc != std::errc{}) {
+            cout << "Invalid port: " << argv[1] << endl;
+            cout << "Usage: ./follower <port>" << endl;
+            return -1;
+        }
+
+        ports.push_back(port);
     }
 
-    string server_address{"0.0.0.0:" + to_string(port)};
-    FollowerImpl service;
+    vector<shared_ptr<grpc::Channel>> channels;
 
-    ServerBuilder builder;
-    builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
-    builder.RegisterService(&service);
-    std::unique_ptr<Server> server(builder.BuildAndStart());
-    std::cout << "Follower listening on " << server_address << std::endl;
-    server->Wait();
+    for (const auto &port: ports) {
+        auto channel =
+                grpc::CreateChannel("localhost:" + to_string(port), grpc::InsecureChannelCredentials());
+        channels.push_back(channel);
+    }
+
+    Leader leader{channels, 2};
 }
