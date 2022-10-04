@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+service TimeServer {
+  rpc GetTime(GetTimeRequest) returns (Timespec) {}
+}
+
+message GetTimeRequest {}
+message SetTimeResponse {}
+
+message Timespec {
+  int64 seconds = 1;
+  int64 nanoseconds = 2;
+}
