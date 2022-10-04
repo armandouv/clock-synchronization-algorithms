@@ -145,7 +145,6 @@ class Leader {
 
             const timespec new_time{average.tv_sec + diff_secs,
                                     average.tv_nsec + diff_ns};
-            cout << new_time.tv_sec << endl;
 
 
             auto delta = new Timeval();
