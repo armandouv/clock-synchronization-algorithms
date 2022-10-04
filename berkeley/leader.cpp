@@ -109,7 +109,7 @@ class Leader {
 
             average.tv_sec += current_follower_time_for_average.tv_sec + ((i + 1) * complete_diff_secs);
             average.tv_nsec += current_follower_time_for_average.tv_nsec + ((i + 1) * complete_diff_ns);
-            // However, we'll always push the original follower time because we need it to calculate the final offset.
+            // However, we'll always push the original follower time, since we need it to calculate the final offset.
             follower_times.push_back(current_follower_time);
         }
 
@@ -123,7 +123,7 @@ class Leader {
                                  get_ns_offset(average, current_time) / 1000};
         auto status_code = adjtime(&final_time, nullptr);
         if (status_code != 0)
-            cout << "Couldn't adjust follower's time." << endl;
+            cout << "Couldn't adjust leader's time." << endl;
 
 
         // Take into account the time needed to set new adjusted times.
@@ -186,7 +186,7 @@ int main(int argc, char *argv[]) {
 
         if (errc != std::errc{}) {
             cout << "Invalid port: " << argv[i] << endl;
-            cout << "Usage: ./follower <port>" << endl;
+            cout << "Usage: ./leader <port>" << endl;
             return -1;
         }
 
